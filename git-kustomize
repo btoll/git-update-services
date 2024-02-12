@@ -1,0 +1,55 @@
+#!/bin/bash
+
+set -eo pipefail
+
+usage() {
+    printf "Usage: git kustomize [args]
+
+Args:
+--project, -p   The project in which the services were added in \`./applications/\`.
+--env           The environment stage.
+--help,    -h   Help.\n"
+}
+
+if [ "$#" -gt 0 ]; then
+    while [ "$#" -gt 0 ]; do
+        OPT="$1"
+        case "$OPT" in
+            --project|-p) shift; PROJECT="$1" ;;
+            --env) shift; ENV="$1" ;;
+            --help|-h) usage; exit 0 ;;
+            *) printf "%b Unrecognized option \`%s\`.\n" "$ERROR" "$OPT"; usage; exit 1 ;;
+        esac
+        shift
+    done
+fi
+
+if ! git rev-parse --show-toplevel &> /dev/null
+then
+    echo "[ERROR] This needs to be run in a Git repository."
+    exit 1
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+if [ "$ROOT" != "$(pwd)" ]
+then
+    echo "[ERROR] This command must be run from the toplevel of the working tree."
+    exit 1
+fi
+
+if [ -z "$PROJECT" ] || [ -z "$ENV" ]
+then
+    echo -e "[ERROR] Both \`PROJECT\` and \`ENV\` must be set.\n"
+    usage
+    exit 1
+fi
+
+if ! command -v git-update-services
+then
+    echo "[ERROR] The binary \`git-update-services\` could not be found in your PATH."
+    exit
+fi
+
+git-update-services -root "$ROOT" -project "$PROJECT" -env "$ENV"
+
