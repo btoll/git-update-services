@@ -26,10 +26,10 @@ type Project struct {
 	Resources []string
 }
 
-func getCurrentEntries(filename string) []string {
+func getCurrentEntries(filename string) ([]string, error) {
 	fd, err := os.Open(filename)
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 	defer fd.Close()
 
@@ -45,7 +45,14 @@ func getCurrentEntries(filename string) []string {
 	if err := scanner.Err(); err != nil {
 		fmt.Println(err)
 	}
-	return current
+	return current, nil
+}
+
+func ifErr(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 
 func main() {
@@ -61,16 +68,14 @@ func main() {
 	if errors.Is(err, os.ErrNotExist) {
 		fmt.Println("No `kustomization.yaml` file, creating.")
 	} else {
-		services = getCurrentEntries(filePath)
+		services, err = getCurrentEntries(filePath)
+		ifErr(err)
 	}
 	entries, err := os.ReadDir(fmt.Sprintf("%s/applications/%s", *root, *project))
-	if err != nil {
-		fmt.Println("err", err)
-		os.Exit(1)
-	}
+	ifErr(err)
 	for _, entry := range entries {
 		if entry.IsDir() {
-			// The entries MUST be created relative to the repository root.
+			// The entries MUST be created relative to the repository root for `kustomize` to work.
 			newResource := fmt.Sprintf("../../applications/%s/%s/overlays/%s", *project, entry.Name(), *env)
 			if !slices.Contains(services, newResource) {
 				services = append(services, newResource)
@@ -83,12 +88,8 @@ func main() {
 		Resources: services,
 	}
 	fd, err := os.Create(filePath)
-	if err != nil {
-		fmt.Println("err", err)
-	}
+	ifErr(err)
 	tpl := template.Must(template.New("kustomization.yaml").Parse(tplKustomization))
 	err = tpl.Execute(fd, p)
-	if err != nil {
-		fmt.Println("err", err)
-	}
+	ifErr(err)
 }
