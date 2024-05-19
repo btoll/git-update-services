@@ -46,6 +46,10 @@ $ git-update-services --project devops --env beta
 $ git kustomize --project devops --env beta
 ```
 
+## Miscellaneous
+
+Currently, it's not possible to add every project (and every app in a project) under the `--appDir` at once (is this even a viable use case?).
+
 ## License
 
 [GPLv3](COPYING)

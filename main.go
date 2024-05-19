@@ -1,8 +1,5 @@
 package main
 
-// Currently, it's not possible to add every project (and every app in a project)
-// under "applications" at once (is this a viable use case?).
-
 import (
 	"bufio"
 	"errors"
@@ -67,11 +64,9 @@ func main() {
 	project := flag.String("project", "", "The name of the project")
 	root := flag.String("root", ".", "The root of the project directory")
 	flag.Parse()
-
 	if *project == "" {
 		ifErr(errors.New("No `project` given, exiting."))
 	}
-
 	services := []string{}
 	envConfigPath := fmt.Sprintf("%s/config/%s", *root, *env)
 	_, err := os.Stat(envConfigPath)
@@ -101,15 +96,14 @@ func main() {
 		return nil
 	})
 	if len(services) > 0 {
-		p := Project{
-			Name:      *project,
-			Env:       *env,
-			Resources: services,
-		}
 		fd, err := os.Create(filePath)
 		ifErr(err)
 		tpl := template.Must(template.New("kustomization.yaml").Parse(tplKustomization))
-		err = tpl.Execute(fd, p)
+		err = tpl.Execute(fd, Project{
+			Name:      *project,
+			Env:       *env,
+			Resources: services,
+		})
 		ifErr(err)
 	}
 }
