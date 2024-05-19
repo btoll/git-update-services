@@ -1,16 +1,21 @@
 package main
 
+// Currently, it's not possible to add every project (and every app in a project)
+// under "applications" at once (is this a viable use case?).
+
 import (
 	"bufio"
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"regexp"
 	"slices"
 	"text/template"
 )
 
+var reOverlays = regexp.MustCompile(`^.*overlays$`)
 var reResources = regexp.MustCompile(`-\s(?P<Resource>.*$)`)
 
 var tplKustomization = `apiVersion: kustomize.config.k8s.io/v1beta1
@@ -56,40 +61,55 @@ func ifErr(err error) {
 }
 
 func main() {
+	appDir := flag.String("app", "applications", "The directory that contains the applications")
 	env := flag.String("env", "beta", "The environment stage")
 	//	exclude := flag.String("exclude", "", "The service names to exclude")
 	project := flag.String("project", "", "The name of the project")
 	root := flag.String("root", ".", "The root of the project directory")
 	flag.Parse()
 
+	if *project == "" {
+		ifErr(errors.New("No `project` given, exiting."))
+	}
+
 	services := []string{}
-	filePath := fmt.Sprintf("%s/config/%s/kustomization.yaml", *root, *env)
-	_, err := os.Stat(filePath)
+	envConfigPath := fmt.Sprintf("%s/config/%s", *root, *env)
+	_, err := os.Stat(envConfigPath)
 	if errors.Is(err, os.ErrNotExist) {
-		fmt.Println("No `kustomization.yaml` file, creating.")
-	} else {
+		ifErr(os.MkdirAll(envConfigPath, os.ModePerm))
+	}
+	filePath := fmt.Sprintf("%s/kustomization.yaml", envConfigPath)
+	_, err = os.Stat(filePath)
+	if !errors.Is(err, os.ErrNotExist) {
 		services, err = getCurrentEntries(filePath)
 		ifErr(err)
 	}
-	entries, err := os.ReadDir(fmt.Sprintf("%s/applications/%s", *root, *project))
-	ifErr(err)
-	for _, entry := range entries {
-		if entry.IsDir() {
-			// The entries MUST be created relative to the repository root for `kustomize` to work.
-			newResource := fmt.Sprintf("../../applications/%s/%s/overlays/%s", *project, entry.Name(), *env)
-			if !slices.Contains(services, newResource) {
-				services = append(services, newResource)
+	fileSystem := os.DirFS(fmt.Sprintf("%s/%s/%s", *root, *appDir, *project))
+	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+		ifErr(err)
+		if reOverlays.MatchString(path) {
+			envDir := fmt.Sprintf("%s/%s/%s", fileSystem, path, *env)
+			_, err := os.Stat(envDir)
+			if !errors.Is(err, os.ErrNotExist) {
+				// The entries MUST be created relative to the repository root for `kustomize` to work.
+				relativeEnvDir := fmt.Sprintf("../../%s", envDir)
+				if !slices.Contains(services, relativeEnvDir) {
+					services = append(services, relativeEnvDir)
+				}
 			}
 		}
+		return nil
+	})
+	if len(services) > 0 {
+		p := Project{
+			Name:      *project,
+			Env:       *env,
+			Resources: services,
+		}
+		fd, err := os.Create(filePath)
+		ifErr(err)
+		tpl := template.Must(template.New("kustomization.yaml").Parse(tplKustomization))
+		err = tpl.Execute(fd, p)
+		ifErr(err)
 	}
-	p := Project{
-		Name:      *project,
-		Env:       *env,
-		Resources: services,
-	}
-	fd, err := os.Create(filePath)
-	ifErr(err)
-	tpl := template.Must(template.New("kustomization.yaml").Parse(tplKustomization))
-	err = tpl.Execute(fd, p)
-	ifErr(err)
 }
