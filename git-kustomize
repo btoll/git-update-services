@@ -6,19 +6,22 @@ usage() {
     printf "Usage: git kustomize [args]
 
 Args:
---project, -p   The project in which the services were added in \`./applications/\`.
---env           The environment stage.
---help,    -h   Help.\n"
+--appDir, -d   The directory that contains the applications (defaults to \"applications\").
+--project, -p  The project in which the services were added to \`--appDir\`.
+--env          The environment stage.
+--help,    -h  Help.\n"
+    exit "$1"
 }
 
 if [ "$#" -gt 0 ]; then
     while [ "$#" -gt 0 ]; do
         OPT="$1"
         case "$OPT" in
+            --appDir|-d) shift; APPDIR="$1" ;;
             --project|-p) shift; PROJECT="$1" ;;
             --env) shift; ENV="$1" ;;
-            --help|-h) usage; exit 0 ;;
-            *) printf "%b Unrecognized option \`%s\`.\n" "$ERROR" "$OPT"; usage; exit 1 ;;
+            --help|-h) usage 0 ;;
+            *) printf "%b Unrecognized option \`%s\`.\n" "$ERROR" "$OPT"; usage 1 ;;
         esac
         shift
     done
@@ -41,8 +44,7 @@ fi
 if [ -z "$PROJECT" ] || [ -z "$ENV" ]
 then
     echo -e "[ERROR] Both \`PROJECT\` and \`ENV\` must be set.\n"
-    usage
-    exit 1
+    usage 1
 fi
 
 if ! command -v git-update-services
@@ -51,5 +53,5 @@ then
     exit
 fi
 
-git-update-services -root "$ROOT" -project "$PROJECT" -env "$ENV"
+git-update-services --appDir "${APPDIR:-applications}" --root "$ROOT" --project "$PROJECT" --env "$ENV"
 
