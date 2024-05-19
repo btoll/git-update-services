@@ -1,10 +1,16 @@
 # git-update-services
 
-This is to be used either as a [Git extension] or as a standalone tool.  It's purpose is to generate a `kustomization.yaml` file that lists all of the particular services or applications that reside in a [`GitOps` directory structure] that should be synced and deployed by a tool like [Flux] or [Argo CD].
+This is to be used either as a [Git extension] or as a standalone tool.  It's purpose is to generate a `kustomization.yaml` file for a particular environment stage (i.e., `production`, `beta`, `development`, etc.) that lists all of the particular services or applications that reside in a [`GitOps` directory structure] that should be synced and deployed by a tool like [Flux] or [Argo CD].
 
 The reason this exists is because [`kustomize`] doesn't currently have [support for globbing], which makes maintaining a `kustomization.yaml` that references other "kustomized" directories potentially painstaking and error prone.
 
 This is especially helpful in a multi-cluster environment where all services for a particular environment stage like `production`, `beta`, `development`, etc. are located in a location with `kustomize` overlays for each service.
+
+## How It Works
+
+`git-update-services` will recurse down the directory structure underneath the `--appDir` location (defaults to `applications`), looking for an `overlays` directory.  If it finds one, it will determine if it has a child directory that matches the string given to `env (i.e., `overlays/production`).
+
+If one exists, it will add it to the `kustomization.yaml` file for that particular environment **only if** `kustomization.yaml` doesn't yet contain the path for that particular application.
 
 ## Installation
 
@@ -28,8 +34,16 @@ To use as an extension to Git, move the `git-kustomize` file anywhere in your pa
 
 ## Examples
 
+### `git-update-services`
+
 ```bash
-$ git kustomize -p devops --env beta
+$ git-update-services --project devops --env beta
+```
+
+### `git-kustomize`
+
+```bash
+$ git kustomize --project devops --env beta
 ```
 
 ## License
