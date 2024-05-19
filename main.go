@@ -92,7 +92,7 @@ func main() {
 			_, err := os.Stat(envDir)
 			if !errors.Is(err, os.ErrNotExist) {
 				// The entries MUST be created relative to the repository root for `kustomize` to work.
-				relativeEnvDir := fmt.Sprintf("../../%s", envDir)
+				relativeEnvDir := fmt.Sprintf("../.%s", envDir)
 				if !slices.Contains(services, relativeEnvDir) {
 					services = append(services, relativeEnvDir)
 				}
